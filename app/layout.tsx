@@ -15,12 +15,8 @@ export default function RootLayout({
 }) {
   return (
     <html lang="zh-CN">
-      <body className={`${inter.className} tech-grid relative`}>
+      <body className={`${inter.className} tech-grid`}>
         {children}
-        {/* 版本信息 - 固定在右下角，与右上角版本号对齐 */}
-        <div className="fixed bottom-4 right-8 text-blue-400 text-xs opacity-80 z-50 pointer-events-none">
-          Teampo Intelligence v1.0
-        </div>
       </body>
     </html>
   )

@@ -43,15 +43,15 @@ export default function Home() {
   }, []);
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-slate-900 via-blue-900 to-slate-800">
+    <div className="min-h-screen bg-gradient-to-br from-slate-900 via-blue-900 to-slate-800 flex flex-col">
       <Header />
-      
-      <main className="container mx-auto px-4 py-8">
-        <div className="space-y-8">
+
+      <main className="container mx-auto px-4 py-8 flex-1 flex flex-col">
+        <div className="space-y-8 flex-1">
           {/* 搜索区域 */}
           <div className="glass-effect rounded-2xl p-8">
-            <SearchForm 
-              onSearch={handleSearch} 
+            <SearchForm
+              onSearch={handleSearch}
               isLoading={isLoading}
               searchHistory={searchHistory}
             />
@@ -81,6 +81,13 @@ export default function Home() {
               </div>
             </div>
           )}
+        </div>
+
+        {/* 底部版本信息 - 与右上角版本号对齐 */}
+        <div className="mt-auto pt-16 pb-8 text-right">
+          <div className="text-blue-400 text-xs opacity-80">
+            Teampo Intelligence v1.0
+          </div>
         </div>
       </main>
     </div>
