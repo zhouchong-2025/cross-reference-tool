@@ -4,17 +4,19 @@ import { useState, useCallback, useEffect } from 'react';
 import { useDropzone } from 'react-dropzone';
 
 interface SearchFormProps {
-  onSearch: (query: string | string[]) => void;
+  onSearch: (query: string | string[], searchType: 'single' | 'batch' | 'image') => void;
+  onSearchTypeChange: (searchType: 'single' | 'batch' | 'image') => void;
   isLoading: boolean;
   searchHistory: string[];
 }
 
-export default function SearchForm({ onSearch, isLoading, searchHistory }: SearchFormProps) {
+export default function SearchForm({ onSearch, onSearchTypeChange, isLoading, searchHistory }: SearchFormProps) {
   const [singleInput, setSingleInput] = useState('');
   const [batchInput, setBatchInput] = useState('');
   const [imageInput, setImageInput] = useState('');
   const [searchType, setSearchType] = useState<'single' | 'batch' | 'image'>('single');
   const [recognizedText, setRecognizedText] = useState('');
+  const [recognizedModels, setRecognizedModels] = useState<string[]>([]);
   const [isRecognizing, setIsRecognizing] = useState(false);
   const [pastedImage, setPastedImage] = useState<string | null>(null);
 
@@ -57,11 +59,13 @@ export default function SearchForm({ onSearch, isLoading, searchHistory }: Searc
       });
 
       const result = await response.json();
-      
+
       if (result.success) {
         setRecognizedText(result.recognizedText);
-        setImageInput(result.chipModels.join(', '));
-        
+        const models = result.chipModels || result.recognizedText.split(/[,，\n\r]+/).map((s: string) => s.trim()).filter((s: string) => s.length > 0);
+        setRecognizedModels(models);
+        setImageInput(models.join(', '));
+
         // 移除自动搜索，等待用户确认
       } else {
         alert(`识别失败: ${result.message}`);
@@ -120,9 +124,9 @@ export default function SearchForm({ onSearch, isLoading, searchHistory }: Searc
         .split(/[,，\n\r\s]+/)
         .map(q => q.trim())
         .filter(q => q.length > 0);
-      onSearch(queries);
+      onSearch(queries, searchType);
     } else {
-      onSearch(currentInput.trim());
+      onSearch(currentInput.trim(), searchType);
     }
   };
 
@@ -148,7 +152,10 @@ export default function SearchForm({ onSearch, isLoading, searchHistory }: Searc
       <div className="flex space-x-4">
         <button
           type="button"
-          onClick={() => setSearchType('single')}
+          onClick={() => {
+            setSearchType('single');
+            onSearchTypeChange('single');
+          }}
           className={`px-4 py-2 rounded-lg font-medium transition-all ${
             searchType === 'single'
               ? 'bg-blue-600 text-white shadow-lg shadow-blue-500/25'
@@ -159,7 +166,10 @@ export default function SearchForm({ onSearch, isLoading, searchHistory }: Searc
         </button>
         <button
           type="button"
-          onClick={() => setSearchType('batch')}
+          onClick={() => {
+            setSearchType('batch');
+            onSearchTypeChange('batch');
+          }}
           className={`px-4 py-2 rounded-lg font-medium transition-all ${
             searchType === 'batch'
               ? 'bg-blue-600 text-white shadow-lg shadow-blue-500/25'
@@ -170,7 +180,10 @@ export default function SearchForm({ onSearch, isLoading, searchHistory }: Searc
         </button>
         <button
           type="button"
-          onClick={() => setSearchType('image')}
+          onClick={() => {
+            setSearchType('image');
+            onSearchTypeChange('image');
+          }}
           className={`px-4 py-2 rounded-lg font-medium transition-all ${
             searchType === 'image'
               ? 'bg-blue-600 text-white shadow-lg shadow-blue-500/25'
@@ -256,6 +269,7 @@ export default function SearchForm({ onSearch, isLoading, searchHistory }: Searc
                       e.stopPropagation();
                       setPastedImage(null);
                       setRecognizedText('');
+                      setRecognizedModels([]);
                       setImageInput('');
                     }}
                     className="text-sm bg-red-600/80 hover:bg-red-600 text-white px-3 py-1 rounded transition-colors"
@@ -287,37 +301,63 @@ export default function SearchForm({ onSearch, isLoading, searchHistory }: Searc
           </div>
 
           {/* 识别结果 */}
-          {recognizedText && (
+          {recognizedModels.length > 0 && (
             <div className="bg-green-500/10 border border-green-400/30 rounded-lg p-4">
-              <h4 className="text-green-300 font-medium mb-3">识别结果：</h4>
+              <h4 className="text-green-300 font-medium mb-3">识别结果（可编辑）：</h4>
               <div className="space-y-2">
-                {recognizedText.split(/[,，\n\r]+/).map((model, index) => {
-                  const trimmedModel = model.trim();
-                  if (!trimmedModel) return null;
-                  return (
-                    <div 
-                      key={index}
-                      className="bg-blue-600/20 text-blue-200 px-3 py-2 rounded-lg font-mono text-sm border border-blue-500/30"
+                {recognizedModels.map((model, index) => (
+                  <div
+                    key={index}
+                    className="flex items-center space-x-2"
+                  >
+                    <input
+                      type="text"
+                      value={model}
+                      onChange={(e) => {
+                        const newModels = [...recognizedModels];
+                        newModels[index] = e.target.value;
+                        setRecognizedModels(newModels);
+                        setImageInput(newModels.join(', '));
+                      }}
+                      className="flex-1 bg-blue-600/20 text-blue-200 px-3 py-2 rounded-lg font-mono text-sm border border-blue-500/30 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                      placeholder="芯片型号"
+                    />
+                    <button
+                      onClick={() => {
+                        const newModels = recognizedModels.filter((_, i) => i !== index);
+                        setRecognizedModels(newModels);
+                        setImageInput(newModels.join(', '));
+                        if (newModels.length === 0) {
+                          setRecognizedText('');
+                        }
+                      }}
+                      className="text-sm bg-red-600/80 hover:bg-red-600 text-white px-3 py-2 rounded transition-colors"
+                      title="删除此料号"
                     >
-                      {trimmedModel}
-                    </div>
-                  );
-                }).filter(Boolean)}
+                      ✕
+                    </button>
+                  </div>
+                ))}
               </div>
               <div className="mt-3 flex space-x-2">
                 <button
                   onClick={() => {
-                    const chipModels = recognizedText.split(/[,，\n\r]+/).map(s => s.trim()).filter(s => s.length > 0);
+                    const chipModels = recognizedModels.map(s => s.trim()).filter(s => s.length > 0);
                     if (chipModels.length > 0) {
-                      onSearch(chipModels);
+                      onSearch(chipModels, 'image');
                     }
                   }}
-                  className="text-sm bg-green-600 hover:bg-green-700 text-white px-3 py-1 rounded transition-colors"
+                  disabled={recognizedModels.filter(s => s.trim().length > 0).length === 0}
+                  className="text-sm bg-green-600 hover:bg-green-700 text-white px-3 py-1 rounded transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
                 >
                   开始查询替代料
                 </button>
                 <button
-                  onClick={() => setRecognizedText('')}
+                  onClick={() => {
+                    setRecognizedText('');
+                    setRecognizedModels([]);
+                    setImageInput('');
+                  }}
                   className="text-sm bg-gray-600 hover:bg-gray-700 text-white px-3 py-1 rounded transition-colors"
                 >
                   清除
