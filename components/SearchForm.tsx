@@ -339,6 +339,69 @@ export default function SearchForm({ onSearch, onSearchTypeChange, isLoading, se
                   </div>
                 ))}
               </div>
+
+              {/* 手动添加型号 */}
+              <div className="mt-4 pt-4 border-t border-green-400/20">
+                <h5 className="text-green-300 text-sm font-medium mb-2">手动添加型号：</h5>
+                <div className="flex space-x-2">
+                  <input
+                    type="text"
+                    id="manualAddInput"
+                    placeholder="输入型号，支持多个（用逗号或换行分隔）"
+                    className="flex-1 bg-blue-600/20 text-blue-200 px-3 py-2 rounded-lg text-sm border border-blue-500/30 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                    onKeyDown={(e) => {
+                      if (e.key === 'Enter' && !e.shiftKey) {
+                        e.preventDefault();
+                        const input = e.currentTarget;
+                        const value = input.value.trim();
+                        if (value) {
+                          // 支持批量添加：用逗号、换行或空格分隔
+                          const newModels = value
+                            .split(/[,，\n\r\s]+/)
+                            .map(s => s.trim())
+                            .filter(s => s.length > 0)
+                            .filter(s => !recognizedModels.includes(s)); // 去重
+
+                          if (newModels.length > 0) {
+                            const updatedModels = [...recognizedModels, ...newModels];
+                            setRecognizedModels(updatedModels);
+                            setImageInput(updatedModels.join(', '));
+                            input.value = '';
+                          }
+                        }
+                      }
+                    }}
+                  />
+                  <button
+                    onClick={() => {
+                      const input = document.getElementById('manualAddInput') as HTMLInputElement;
+                      const value = input?.value.trim();
+                      if (value) {
+                        // 支持批量添加：用逗号、换行或空格分隔
+                        const newModels = value
+                          .split(/[,，\n\r\s]+/)
+                          .map(s => s.trim())
+                          .filter(s => s.length > 0)
+                          .filter(s => !recognizedModels.includes(s)); // 去重
+
+                        if (newModels.length > 0) {
+                          const updatedModels = [...recognizedModels, ...newModels];
+                          setRecognizedModels(updatedModels);
+                          setImageInput(updatedModels.join(', '));
+                          input.value = '';
+                        }
+                      }
+                    }}
+                    className="text-sm bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded transition-colors whitespace-nowrap"
+                  >
+                    ➕ 添加
+                  </button>
+                </div>
+                <p className="text-blue-400 text-xs mt-1">
+                  💡 提示：可以一次添加多个型号，用逗号或空格分隔，按 Enter 快速添加
+                </p>
+              </div>
+
               <div className="mt-3 flex space-x-2">
                 <button
                   onClick={() => {
