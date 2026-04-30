@@ -24,7 +24,7 @@ export class VisionAPI {
           'Content-Type': 'application/json',
         },
         body: JSON.stringify({
-          model: 'Qwen/Qwen3-VL-30B-A3B-Instruct',
+          model: 'deepseek-ai/deepseek-vl2',
           messages: [
             {
               role: 'user',

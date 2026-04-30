@@ -65,52 +65,85 @@ class DataProcessor {
         console.log('工作表数量:', workbook.SheetNames.length);
         console.log('所有工作表名称:', workbook.SheetNames);
         
-        const sheetName = workbook.SheetNames[0];
-        console.log('使用工作表:', sheetName);
-        
-        const worksheet = workbook.Sheets[sheetName];
-        
-        // 获取工作表范围信息
-        const range = XLSX.utils.decode_range(worksheet['!ref'] || 'A1');
-        console.log(`工作表范围: ${range.s.c},${range.s.r} 到 ${range.e.c},${range.e.r}`);
-        console.log(`估计行数: ${range.e.r + 1}, 估计列数: ${range.e.c + 1}`);
-        
-        const rawData = XLSX.utils.sheet_to_json(worksheet);
-        console.log(`Excel文件读取成功，原始数据行数: ${rawData.length}`);
-        
-        this.data = rawData.map((row: any, index: number) => {
-          try {
-            const originalModel = String(row['目标料(客户提供)'] || '').trim();
-            const originalBrand = String(row['__EMPTY'] || '').trim();
-            const originalFunction = String(row['__EMPTY_1'] || '').trim();
-            const replacementBrand = String(row['替代料(由FAE填写)'] || '').trim();
-            const replacementModel = String(row['__EMPTY_3'] || '').trim();
-            const notes = String(row['__EMPTY_4'] || '').trim();
-            const advantages = String(row['__EMPTY_5'] || '').trim();
-            
-            if (!originalModel || originalModel === '型号' || !replacementModel) {
-              return null;
+        // 需要读取的工作表列表（跳过说明类工作表）
+        const skipSheets = ['使用说明'];
+        const targetSheets = workbook.SheetNames.filter(name => !skipSheets.includes(name));
+        console.log('将读取工作表:', targetSheets);
+
+        const allRows: ChipData[] = [];
+
+        for (const sheetName of targetSheets) {
+          const worksheet = workbook.Sheets[sheetName];
+          const range = XLSX.utils.decode_range(worksheet['!ref'] || 'A1');
+          console.log(`工作表"${sheetName}"范围: 行${range.e.r + 1}, 列${range.e.c + 1}`);
+
+          // 以数组形式读取，手动定位表头行
+          const rawRows: any[][] = XLSX.utils.sheet_to_json(worksheet, { header: 1 });
+
+          // 找到包含"型号"和"品牌"的表头行
+          let headerRowIndex = -1;
+          for (let i = 0; i < Math.min(rawRows.length, 10); i++) {
+            const row = rawRows[i];
+            if (row && row.some(c => String(c || '').includes('型号')) && row.some(c => String(c || '').includes('品牌'))) {
+              headerRowIndex = i;
+              break;
             }
-            
+          }
+
+          if (headerRowIndex === -1) {
+            console.log(`工作表"${sheetName}"未找到标准表头，跳过`);
+            continue;
+          }
+
+          const headers: string[] = rawRows[headerRowIndex].map(c => String(c || '').trim());
+          console.log(`工作表"${sheetName}"表头(行${headerRowIndex}):`, headers);
+
+          // 定位列索引：目标料区域(型号/品牌/功能/封装) + 替代料区域(品牌/型号/备注/优势)
+          // 表头格式: ["型号","品牌","功能","封装","品牌","型号","备注","替代料优势点"]
+          const colOrigModel = headers.indexOf('型号');
+          const colOrigBrand = headers.indexOf('品牌');
+          const colOrigFunc = headers.indexOf('功能');
+          // 替代料的"品牌"和"型号"是第二次出现
+          const colRepBrand = headers.indexOf('品牌', colOrigBrand + 1);
+          const colRepModel = headers.indexOf('型号', colOrigModel + 1);
+          const colNotes = headers.indexOf('备注');
+          const colAdvantages = headers.findIndex(h => h.includes('优势'));
+
+          if (colOrigModel === -1 || colRepModel === -1) {
+            console.log(`工作表"${sheetName}"列结构不匹配，跳过`);
+            continue;
+          }
+
+          for (let i = headerRowIndex + 1; i < rawRows.length; i++) {
+            const row = rawRows[i];
+            if (!row) continue;
+            const originalModel = String(row[colOrigModel] || '').trim();
+            const originalBrand = String(colOrigBrand >= 0 ? (row[colOrigBrand] || '') : '').trim();
+            const originalFunction = String(colOrigFunc >= 0 ? (row[colOrigFunc] || '') : '').trim();
+            const replacementBrand = String(colRepBrand >= 0 ? (row[colRepBrand] || '') : '').trim();
+            const replacementModel = String(row[colRepModel] || '').trim();
+            const notes = String(colNotes >= 0 ? (row[colNotes] || '') : '').trim();
+            const advantages = String(colAdvantages >= 0 ? (row[colAdvantages] || '') : '').trim();
+
+            if (!originalModel || originalModel === '型号' || !replacementModel || replacementModel === '型号') {
+              continue;
+            }
+
             const replaceType = this.determineReplaceType(notes, advantages);
-            
-            return {
+            allRows.push({
               originalModel,
-              originalBrand, // 添加原型号品牌
+              originalBrand,
               replacementModel,
               brand: replacementBrand,
               function: originalFunction || '未描述',
               replaceType
-            } as ChipData;
-          } catch (error) {
-            console.warn(`第${index + 1}行数据处理失败:`, error);
-            return null;
+            } as ChipData);
           }
-        }).filter((item): item is ChipData => 
-          item !== null && 
-          item.originalModel.length > 0 && 
-          item.replacementModel.length > 0
-        );
+
+          console.log(`工作表"${sheetName}"解析完成，累计记录: ${allRows.length}`);
+        }
+
+        this.data = allRows;
         
         this.initialized = true;
         console.log(`✅ 数据库初始化完成，有效记录数: ${this.data.length}`);
