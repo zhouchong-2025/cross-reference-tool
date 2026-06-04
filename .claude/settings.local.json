@@ -17,7 +17,8 @@
       "Bash(test:*)",
       "Bash(cat:*)",
       "WebSearch",
-      "WebFetch(domain:cloud.siliconflow.cn)"
+      "WebFetch(domain:cloud.siliconflow.cn)",
+      "Bash(findstr:*)"
     ],
     "deny": [],
     "ask": []
